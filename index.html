@@ -1,48 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="et">
 <head>
   <meta charset="UTF-8" />
-  <title>Kinnitamine</title>
+  <title>Kinnitusleht</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 40px; background: #f0f0f0; text-align: center; }
-    button { margin: 10px; padding: 15px 30px; font-size: 18px; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+      text-align: center;
+    }
+    h2 {
+      color: #2c3e50;
+    }
+    button {
+      margin: 1rem 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    #result {
+      font-weight: bold;
+      margin-top: 1rem;
+      color: green;
+    }
   </style>
 </head>
 <body>
-  <h1>Kinnita või keeldu</h1>
-  <p id="pealkiri">Laadin...</p>
-  <button onclick="sendResponse('jah')">KINNITA</button>
-  <button onclick="sendResponse('ei')">KEELDU</button>
+  <h2>Kinnita või keeldu</h2>
+  <p id="pealkiri">Pealkiri: Laadin...</p>
+  <button id="btn-yes">KINNITA</button>
+  <button id="btn-no">KEELDU</button>
   <p id="result"></p>
 
   <script>
-    const rowId = 'i-dcnD-CUNpB'; // lisa sobiv rea ID siia
-    const apiUrl = 'https://script.google.com/macros/s/XXXXXX/exec'; // asenda oma scripti URL-iga
+    const params = new URLSearchParams(window.location.search);
+    const rowId = params.get('rowId');
+    const apiToken = 'SIIN_SAAD_KASUTADA_VAHEMALT_SERVERIPOOLSET_API_TOKENT';
+    const docId = 'ezSI7Mr223';
+    const tableId = 'grid-jH7wCVKpoW';
+    const columnTagastusId = 'c-JikcNoc7uq';
+    const columnPealkiriId = 'c-yNNnQmjlPc';
 
-    // Lae pealkiri Coda API-st
-    fetch(`${apiUrl}?rowId=${rowId}`)
-      .then(res => res.text())
-      .then(html => {
-        document.body.innerHTML = html;
-      })
-      .catch(err => {
-        document.getElementById('pealkiri').innerText = 'Viga andmete laadimisel.';
+    async function fetchRow() {
+      const url = `https://coda.io/apis/v1/docs/${docId}/tables/${tableId}/rows/${rowId}`;
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': 'Bearer ' + apiToken
+        }
       });
+      if (!response.ok) {
+        document.getElementById('pealkiri').innerText = 'Viga andmete laadimisel';
+        return;
+      }
+      const data = await response.json();
+      const pealkiri = data.values ? data.values[columnPealkiriId] : '(puudub)';
+      document.getElementById('pealkiri').innerText = `Pealkiri: ${pealkiri}`;
+    }
 
-    // Saada kinnituse väärtus backendile
-    function sendResponse(value) {
-      fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rowId: rowId, value: value })
-      })
-      .then(res => res.text())
-      .then(text => {
-        document.getElementById('result').innerText = text;
-      })
-      .catch(err => {
-        document.getElementById('result').innerText = 'Salvestamisel viga.';
+    async function updateRow(value) {
+      const url = `https://coda.io/apis/v1/docs/${docId}/tables/${tableId}/rows/${rowId}`;
+      const body = {
+        row: {
+          cells: [
+            {
+              column: columnTagastusId,
+              value: value
+            }
+          ]
+        }
+      };
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer ' + apiToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
       });
+      if (response.ok) {
+        document.getElementById('result').innerText = `Salvestatud väärtus: ${value}`;
+      } else {
+        document.getElementById('result').innerText = `Viga: ${response.statusText}`;
+      }
+    }
+
+    document.getElementById('btn-yes').addEventListener('click', () => updateRow('jah'));
+    document.getElementById('btn-no').addEventListener('click', () => updateRow('ei'));
+
+    if (rowId) {
+      fetchRow();
+    } else {
+      document.getElementById('pealkiri').innerText = 'Puudub rowId parameeter URL-is';
     }
   </script>
 </body>
